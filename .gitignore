@@ -1,3 +1,6 @@
 **/.md
 **/.txt
 **/.venv/
+**/*.lock
+**/*.toml
+**/.python-version
