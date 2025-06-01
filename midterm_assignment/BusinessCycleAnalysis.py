@@ -2,7 +2,6 @@ import pandas as pd
 import pandas_datareader.data as web
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
-import pandas_datareader as pdr
 import numpy as np
 
 # set the start and end dates for the data
@@ -33,7 +32,7 @@ def apply_hp_filter(log_gdp, lambda_values=[10, 100, 1600]):
 
 def plot_original_and_trends(log_gdp, hp_results, country_name):
     """Plot original data with trend components"""
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(16, 12))
 
     plt.plot(
         log_gdp.index, log_gdp.values, label="Log Real GDP", linewidth=2, color="black"
@@ -60,7 +59,7 @@ def plot_original_and_trends(log_gdp, hp_results, country_name):
 
 def plot_cyclical_components(hp_results, country_name):
     """Plot cyclical components for different lambda values"""
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(16, 12))
 
     colors = ["red", "blue", "green"]
     for i, (lamb, result) in enumerate(hp_results.items()):
@@ -102,7 +101,7 @@ def calculate_statistics(cycle1, cycle2):
 
 def plot_comparison(cycle1, cycle2, country1, country2):
     """Plot both countries' cyclical components"""
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(16, 12))
 
     # Use common period
     common_start = max(cycle1.index.min(), cycle2.index.min())
