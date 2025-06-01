@@ -4,20 +4,18 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 import numpy as np
 
-# set the start and end dates for the data
+# Data period
 start_date = "1991-01-01"
-end_date = "2022-01-01"
+end_date = "2025-01-01"
 
 
-# download the data from FRED using pandas_datareader
-def get_gdp_data(country_code, series_id, start_date, end_date):
+def get_gdp_data(series_id, start_date, end_date):
     """Fetch GDP data from FRED"""
     try:
-        gdp_data = web.DataReader(series_id, "fred", start_date, end_date)
-        print(f"{country_code} GDP data successfully downloaded")
-        return gdp_data
+        data = web.DataReader(series_id, "fred", start_date, end_date)
+        return data
     except Exception as e:
-        print(f"Error downloading {country_code} GDP data: {e}")
+        print(f"Error downloading data: {e}")
         return None
 
 
@@ -54,7 +52,7 @@ def plot_original_and_trends(log_gdp, hp_results, country_name):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("test_trends.png")
+    plt.savefig(f"output/{country_name}_trends_v2.png")
 
 
 def plot_cyclical_components(hp_results, country_name):
@@ -78,14 +76,14 @@ def plot_cyclical_components(hp_results, country_name):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("test_cyclical.png")
+    plt.savefig(f"output/{country_name}_cyclical_v2.png")
 
 
 def calculate_statistics(cycle1, cycle2):
     """Calculate standard deviations and correlation"""
-    # Standard deviations
-    std1 = cycle1.std()
-    std2 = cycle2.std()
+    # Standard deviations (multiply by 100 to express as percentage)
+    std1 = cycle1.std() * 100
+    std2 = cycle2.std() * 100
 
     # Correlation (using common period)
     common_start = max(cycle1.index.min(), cycle2.index.min())
@@ -132,7 +130,7 @@ def plot_comparison(cycle1, cycle2, country1, country2):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("test_comparison.png")
+    plt.savefig(f"output/{country1} vs {country2}.png")
 
 
 def main():
@@ -141,8 +139,8 @@ def main():
 
     # 1. Download data
     print("1. Downloading data...")
-    germany_gdp = get_gdp_data("Germany", "CLVMNACSCAB1GQDE", start_date, end_date)
-    japan_gdp = get_gdp_data("Japan", "JPNRGDPEXP", start_date, end_date)
+    germany_gdp = get_gdp_data("CLVMNACSCAB1GQDE", start_date, end_date)  # Germany
+    japan_gdp = get_gdp_data("JPNRGDPEXP", start_date, end_date)  # Japan
 
     if germany_gdp is None or japan_gdp is None:
         print("Failed to download data")
@@ -161,12 +159,18 @@ def main():
     # 4. Visualizations
     print("4. Creating plots...")
 
-    # Germany plots
+    # Germany plots (First)
+    print("Creating Germany trends plot...")
     plot_original_and_trends(log_germany.iloc[:, 0], germany_hp, "Germany")
+
+    print("Creating Germany cyclical components plot...")
     plot_cyclical_components(germany_hp, "Germany")
 
-    # Japan plots
+    # Japan plots (Second)
+    print("Creating Japan trends plot...")
     plot_original_and_trends(log_japan.iloc[:, 0], japan_hp, "Japan")
+
+    print("Creating Japan cyclical components plot...")
     plot_cyclical_components(japan_hp, "Japan")
 
     # 5. Statistics and comparison (using λ=1600)
@@ -180,8 +184,8 @@ def main():
     )
 
     print("\n=== Results ===")
-    print(f"Germany cyclical component std: {std_germany:.4f}")
-    print(f"Japan cyclical component std: {std_japan:.4f}")
+    print(f"Germany cyclical component std: {std_germany:.2f}%")
+    print(f"Japan cyclical component std: {std_japan:.2f}%")
     print(f"Correlation between cycles: {correlation:.4f}")
 
     # Comparison plot
