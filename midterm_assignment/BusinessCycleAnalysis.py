@@ -52,7 +52,7 @@ def plot_original_and_trends(log_gdp, hp_results, country_name):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f"output/{country_name}_trends_v2.png")
+    plt.savefig(f"output/{country_name}_trends.png")
 
 
 def plot_cyclical_components(hp_results, country_name):
@@ -76,7 +76,7 @@ def plot_cyclical_components(hp_results, country_name):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f"output/{country_name}_cyclical_v2.png")
+    plt.savefig(f"output/{country_name}_cyclical.png")
 
 
 def calculate_statistics(cycle1, cycle2):
