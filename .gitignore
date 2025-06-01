@@ -4,3 +4,4 @@
 **/*.lock
 **/*.toml
 **/.python-version
+.gitignore
