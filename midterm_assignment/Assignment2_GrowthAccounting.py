@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 
-# Load Penn World Table data
-pwt90 = pd.read_stata("https://www.rug.nl/ggdc/docs/pwt90.dta")
+# Load Data
+pwt_data = pd.read_stata("https://www.rug.nl/ggdc/docs/pwt90.dta")
 
 # OECD countries
 oecd_countries = [
@@ -31,87 +31,75 @@ oecd_countries = [
 ]
 
 # Filter data for OECD countries and 1990-2019 period
-data: pd.DataFrame = pd.DataFrame(
-    pwt90[pwt90["country"].isin(oecd_countries) & pwt90["year"].between(1990, 2019)]
+data = pd.DataFrame(
+    pwt_data[
+        pwt_data["country"].isin(oecd_countries) & pwt_data["year"].between(1990, 2019)
+    ]
 )
 
-relevant_cols = [
-    "countrycode",
-    "country",
-    "year",
-    "rgdpna",
-    "rkna",
-    "pop",
-    "emp",
-    "avh",
-    "labsh",
-    "rtfpna",
-]
+relevant_cols = ["countrycode", "country", "year", "rgdpna", "rkna", "emp", "labsh"]
+
 data = data[relevant_cols].dropna()
-
-# Calculate additional variables
-data["alpha"] = 1 - data["labsh"]
-data["y_n"] = data["rgdpna"] / data["emp"]  # Y/N
-data["hours"] = data["emp"] * data["avh"]  # L
-data["tfp_term"] = data["rtfpna"] ** (1 / (1 - data["alpha"]))  # A^(1/(1-alpha))
-data["cap_term"] = (data["rkna"] / data["rgdpna"]) ** (
-    data["alpha"] / (1 - data["alpha"])
-)  # (K/Y)^(alpha/(1-alpha))
-data["lab_term"] = data["hours"] / data["pop"]  # L/N
-
-data = (
-    data.sort_values("year")
-    .groupby("countrycode")
-    .apply(
-        lambda x: x.assign(
-            alpha=1 - x["labsh"],
-            y_n_shifted=100 * x["y_n"] / x["y_n"].iloc[0],
-            tfp_term_shifted=100 * x["tfp_term"] / x["tfp_term"].iloc[0],
-            cap_term_shifted=100 * x["cap_term"] / x["cap_term"].iloc[0],
-            lab_term_shifted=100 * x["lab_term"] / x["lab_term"].iloc[0],
-        ),
-        include_groups=False,
-    )
-    .reset_index(drop=True)
-    .dropna()
-)
 
 
 def calculate_growth_rates(country_data):
-    start_year_actual = country_data["year"].min()
-    end_year_actual = country_data["year"].max()
-    start_data = country_data[country_data["year"] == start_year_actual].iloc[0]
-    end_data = country_data[country_data["year"] == end_year_actual].iloc[0]
+    country_data = country_data.sort_values("year")
+    start_data = country_data.iloc[0]
+    end_data = country_data.iloc[-1]
 
     years = end_data["year"] - start_data["year"]
 
-    g_y = ((end_data["y_n"] / start_data["y_n"]) ** (1 / years) - 1) * 100
-    g_k = ((end_data["cap_term"] / start_data["cap_term"]) ** (1 / years) - 1) * 100
-    g_a = ((end_data["tfp_term"] / start_data["tfp_term"]) ** (1 / years) - 1) * 100
+    # Calculate per-worker variables
+    y_per_worker_start = start_data["rgdpna"] / start_data["emp"]
+    y_per_worker_end = end_data["rgdpna"] / end_data["emp"]
 
-    alpha_avg = (start_data["alpha"] + end_data["alpha"]) / 2.0
-    capital_deepening_contrib = alpha_avg * g_k
-    tfp_growth_calculated = g_a
+    k_per_worker_start = start_data["rkna"] / start_data["emp"]
+    k_per_worker_end = end_data["rkna"] / end_data["emp"]
 
-    tfp_share = tfp_growth_calculated / g_y
-    cap_share = capital_deepening_contrib / g_y
+    # Growth rates (annualized)
+    g_y = ((y_per_worker_end / y_per_worker_start) ** (1 / years) - 1) * 100
+    g_k = ((k_per_worker_end / k_per_worker_start) ** (1 / years) - 1) * 100
+
+    # Capital share (average over period)
+    alpha = (1 - start_data["labsh"] + 1 - end_data["labsh"]) / 2
+
+    # Capital deepening contribution
+    capital_deepening = alpha * g_k
+
+    # TFP Growth as residual (Solow residual)
+    # Following the identity: Growth Rate = TFP Growth + Capital Deepening
+    tfp_growth = g_y - capital_deepening
+
+    # Calculate shares
+    tfp_share = tfp_growth / g_y if g_y != 0 else 0
+    capital_share = capital_deepening / g_y if g_y != 0 else 0
 
     return {
         "Country": start_data["country"],
         "Growth Rate": round(g_y, 2),
-        "TFP Growth": round(tfp_growth_calculated, 2),
-        "Capital Deepening": round(capital_deepening_contrib, 2),
+        "TFP Growth": round(tfp_growth, 2),
+        "Capital Deepening": round(capital_deepening, 2),
         "TFP Share": round(tfp_share, 2),
-        "Capital Share": round(cap_share, 2),
+        "Capital Share": round(capital_share, 2),
     }
 
 
-# Apply the function to each country
-results_list = data.groupby("country").apply(calculate_growth_rates).dropna().tolist()
+# Calculate for each country
+results_list = []
+for country in data["country"].unique():
+    country_data = data[data["country"] == country]
+    if len(country_data) >= 2:
+        result = calculate_growth_rates(country_data)
+        results_list.append(result)
+
+# Create results DataFrame
 results_df = pd.DataFrame(results_list)
 
-# Calculate average row
-avg_row_data = {
+# Sort by country name
+results_df = results_df.sort_values("Country").reset_index(drop=True)
+
+# Add average row
+avg_row = {
     "Country": "Average",
     "Growth Rate": round(results_df["Growth Rate"].mean(), 2),
     "TFP Growth": round(results_df["TFP Growth"].mean(), 2),
@@ -119,7 +107,21 @@ avg_row_data = {
     "TFP Share": round(results_df["TFP Share"].mean(), 2),
     "Capital Share": round(results_df["Capital Share"].mean(), 2),
 }
-results_df = pd.concat([results_df, pd.DataFrame([avg_row_data])], ignore_index=True)
+
+results_df = pd.concat([results_df, pd.DataFrame([avg_row])], ignore_index=True)
+
+# Print Result
+print("Table 5.1")
+print("Growth Accounting in OECD Countries: 1990-2019")
+print("")
+print(
+    f"{'Country':<15} {'Growth Rate':<12} {'TFP Growth':<12} {'Capital Deepening':<18} {'TFP Share':<10} {'Capital Share'}"
+)
+
+for _, row in results_df.iterrows():
+    print(
+        f"{row['Country']:<15} {row['Growth Rate']:<12} {row['TFP Growth']:<12} {row['Capital Deepening']:<18} {row['TFP Share']:<10} {row['Capital Share']}"
+    )
 
 # Save results as CSV file
 results_df.to_csv("./assignment2_result/GrowthAccounting(1990_2019).csv", index=False)
